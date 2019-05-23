@@ -40,26 +40,15 @@ for elem in msg:
     msg_sig=np.concatenate([msg_sig, elem*signal])
 
 
+
 pulse = np.linspace(0, 20, 441300)
-msg_sig1 = msg_sig * np.cos(2 * np.pi * 2000 * pulse)
-pulse = np.linspace(0, 20, 441300)
-msg_sig2 = msg_sig * np.cos(2 * np.pi * 4000 * pulse)
-pulse = np.linspace(0, 20, 441300)
-msg_sig3 = msg_sig * np.cos(2 * np.pi * 6000 * pulse)
-pulse = np.linspace(0, 20, 441300)
-msg_sig4 = msg_sig * np.cos(2 * np.pi * 8000 * pulse)
-
-
-msg_sig = msg_sig1+msg_sig2+msg_sig3+msg_sig4
+msg_sig = msg_sig * np.exp(1j * 20000 * pulse)
+msg_sig = msg_sig * np.exp(1j * -20000 * pulse)
 
 
 
 
-
-
-
-
-plt.plot(msg_sig)
+plt.plot(msg_sig.real)
 plt.show()
 np.savetxt("in_serv.txt", msg)
 
@@ -76,16 +65,11 @@ Y = Y[range(int(n/2))]
 plt.plot(frq, np.abs(Y))
 plt.show()
 
-y_len = len(Y)
-Y = Y[1999:4005]
-Y = np.concatenate([Y, np.zeros(y_len-len(Y))])
 
-plt.plot(np.abs(Y))
-plt.show()
 
 signal_recovered = np.fft.ifft(Y).real
 ls = len(signal_recovered)
 #plt.plot(np.concatenate([signal_recovered[ls//2:], signal_recovered[:ls//2]]))
-plt.plot(signal_recovered[0:3000] *1000)
+plt.plot(signal_recovered)
 plt.show()
 
