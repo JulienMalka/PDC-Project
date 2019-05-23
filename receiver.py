@@ -46,3 +46,26 @@ plt.plot(np.abs(ft))
 plt.show()
 plt.plot(np.abs(ft2))
 plt.show()
+
+Fs = 22050.0
+Ts = 1.0/Fs # sampling interval
+t = np.arange(0,1,Ts) # time vector
+
+n = len(reconstructed_msg) # length of the signal
+k = np.arange(n)
+T = n/Fs
+frq = k/T # two sides frequency range
+frq = frq[range(int(n/2))] # one side frequency range
+
+Y = np.fft.fft(reconstructed_msg)/n # fft computing and normalization
+Y = Y[:(n//2)]
+
+fig, ax = plt.subplots(2, 1)
+ax[0].plot(reconstructed_msg)
+ax[0].set_xlabel('Time')
+ax[0].set_ylabel('Amplitude')
+ax[1].plot(frq,abs(Y),'r') # plotting the spectrum
+ax[1].set_xlabel('Freq (Hz)')
+ax[1].set_ylabel('|Y(freq)|')
+
+plt.show()
