@@ -40,12 +40,12 @@ for elem in msg:
     msg_sig=np.concatenate([msg_sig, elem*signal])
 
 
-
 pulse = np.linspace(0, 20, 441300)
-msg_sig = msg_sig * np.exp(1j * 20000 * pulse)
+msg_sig = msg_sig * np.exp(1j * 2000*2*np.pi * pulse)
 msg_sig = msg_sig * np.exp(1j * -20000 * pulse)
-
-
+msg_sig1 = msg_sig * np.exp(1j * 20000 * pulse)
+msg_sig += msg_sig1
+msg_sig = msg_sig * np.exp(1j * -20000 * pulse)
 
 
 plt.plot(msg_sig.real)
