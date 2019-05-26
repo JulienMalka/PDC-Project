@@ -1,88 +1,105 @@
 import numpy as np
-from scipy.fftpack import fft
-from scipy import signal
 import matplotlib.pyplot as plt
 import scipy
-import random
-from scipy.signal import butter, lfilter, freqz
+from helpers import *
+import binascii
 
-train_sig = [-1, -1, 1, -1, 1, -1, 1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1, -1, -1, -1, 1, -1, 1, -1,
-             -1, 1, -1, -1, -1, -1, 1, -1, 1, 1, 1, 1, -1, -1, -1, 1, 1, -1, 1, -1, -1, 1, -1, -1,
-             1, -1, -1, -1, -1, -1, 1, 1, -1, -1, 1, 1, 1, 1, 1, 1, 1, -1, -1, 1, 1, 1, 1, 1, -1,
-             1, 1, -1, 1, 1, 1, -1, 1, 1, 1, 1, 1, -1, 1, 1, -1, 1, 1, 1, -1, -1, 1, -1, -1, 1, 1,
-             -1, -1, 1, 1, 1, 1, -1, 1, -1, 1, -1, 1, -1, -1, -1, -1, -1, -1, 1, 1, 1, 1, -1, 1,
-             -1, 1, -1, 1, -1, 1, 1, -1, 1, -1, 1, 1, 1, 1, -1, -1, 1, -1, -1, 1, 1, 1, -1, -1,
-             1, 1, 1, -1, 1, -1, -1, -1, 1, -1, 1, -1, 1, 1, 1, 1, 1, -1, -1, 1, 1, 1, 1, 1, 1,
-             -1, 1, -1, -1, -1, 1, 1, -1, 1, 1, -1, 1, -1, -1, -1, -1, -1, -1, -1, 1, 1, 1, 1, 1,
-             -1, -1, -1, -1, 1, 1, -1, -1, 1, 1, -1, -1, 1, -1, -1, 1, -1, 1, 1, -1, -1, -1, -1, 1,
-             1, -1, -1, -1, 1, -1, -1, -1, 1, -1, 1, -1, 1, -1, -1, -1, -1, -1, 1, 1, 1, -1, 1, 1, 1,
-             -1, -1, -1, -1, -1, -1, 1, 1, 1, 1, -1, -1, 1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1, 1, -1, 1,
-             -1, -1, 1, -1, -1, -1, 1, 1, -1, -1, -1, -1, 1, 1, -1, -1, -1, 1, 1, 1, -1, -1, 1, 1, -1,
-             1, 1, -1, 1]
+print("Loading training signals...")
+len_train, train_sig_start = generate_training_sig_start()
+_, train_sig_end = generate_training_sig_end()
 
 
-
-def butter_lowpass(cutoff, fs, order=5):
-    nyq = 0.5 * fs
-    normal_cutoff = cutoff / nyq
-    b, a = butter(order, normal_cutoff, btype='low', analog=False)
-    return b, a
+print("Loading response from server...")
+response = np.loadtxt("out_serv.txt")
 
 
-def butter_lowpass_filter(data, cutoff, fs, order=5):
-    b, a = butter_lowpass(cutoff, fs, order=order)
-    y = lfilter(b, a, data)
-    return y
+print("Estimating delays...")
+
+estimated_delay_start = np.argmax(scipy.signal.correlate(response, train_sig_start)) - len_train + 1
+estimated_delay_end = np.argmax(scipy.signal.correlate(response, train_sig_end)) - len_train + 1
+
+print("Reconstructing signal...")
+reconstructed_msg = response[estimated_delay_start+len_train:estimated_delay_end]
 
 
-len_train = len(train_sig)
-train_sig = np.array(train_sig)
+print("Estimating cut frequencies interval...")
+frq_reconstructed_msg, Y_reconstructed_msg = compute_fft(reconstructed_msg)
+i = np.where(frq_reconstructed_msg >= 1.8*1000)[0][0]
+j = np.where(frq_reconstructed_msg >= 2.2*1000)[0][0]
+k = np.where(frq_reconstructed_msg >= 7.8*1000)[0][0]
+l = np.where(frq_reconstructed_msg >= 8.2*1000)[0][0]
 
-response  = np.loadtxt("out_serv.txt")
-msg = np.loadtxt("in_serv_save.txt")
-msg = msg[len_train:]
+sum_low = np.sum(np.abs(Y_reconstructed_msg[i:j]))
+sum_high = np.sum(np.abs(Y_reconstructed_msg[k:l]))
 
-estimated_delay = np.argmax(scipy.signal.correlate(response, train_sig)) - len_train + 1
-
-print(f"The estimated delay is {estimated_delay}")
-print(f"Actual delay is {response.shape[0]-msg.shape[0]}")
-
-reconstructed_msg = response[estimated_delay+len_train:]
-plt.plot(reconstructed_msg)
-plt.show()
+cut = 2000 if sum_low > sum_high else 8000
 
 
+print("Demodulating signal...")
+pulse = np.linspace(0, len(reconstructed_msg)/sampling_rate, len(reconstructed_msg))
+demodulated_signal = reconstructed_msg * np.exp(1j * -cut*2*np.pi * pulse)
+demodulated_signal = butter_lowpass_filter(demodulated_signal, 1000, sampling_rate, order=15)
 
 
-pulse = np.linspace(0, 189640/22050, 189640)
-reconstructed_msg = reconstructed_msg * np.exp(1j * -7900*2*np.pi * pulse)
+frq_demodulated, Y_demodulated = compute_fft(demodulated_signal)
 
-reconstructed_msg = butter_lowpass_filter(reconstructed_msg, 500, 22050, order=15)
+_, signal = raised_cosine(period_symbol, sampling_rate)
+
+matched_filter = scipy.signal.correlate(demodulated_signal.real, signal)
+
+txt = ""
+for i in range(1, int(len(demodulated_signal)/(sampling_rate*period_symbol)) +1):
+    value = matched_filter[int(sampling_rate*i*period_symbol)]
+    diff1 = np.abs(1-value)
+    diff2 = np.abs(-1-value)
+    if diff1<diff2:
+        txt += "1"
+    else:
+        txt += "0"
 
 
-ft = fft(reconstructed_msg)
-ft2 = fft(msg)
+n = int(txt, 2)
+recovered = n.to_bytes((n.bit_length() + 7) // 8, 'big').decode()
+print(recovered)
+original = open("in.txt").read()
+errors = 0
+for i in range(len(original)):
+    if original[i] != recovered[i]:
+        errors+=1
+
+print(f"Nb of errors : {errors}")
 
 
-Fs = 22050.0
-Ts = 1.0/Fs # sampling interval
-t = np.arange(0,1,Ts) # time vector
 
-n = len(reconstructed_msg) # length of the signal
-k = np.arange(n)
-T = n/Fs
-frq = k/T # two sides frequency range
-frq = frq[range(int(n/2))] # one side frequency range
+fig, ax = plt.subplots(3, 2)
+fig.set_size_inches(18.5, 10.5)
+ax[0][0].plot(response)
+ax[0][0].set_title("Signal sent back by server")
+ax[0][0].set_xlabel('Time')
+ax[0][0].set_ylabel('Amplitude')
 
-Y = np.fft.fft(reconstructed_msg)/n # fft computing and normalization
-Y = Y[:(n//2)]
+ax[0][1].plot(reconstructed_msg)
+ax[0][1].set_title("Reconstructed signal after removing delays")
+ax[0][1].set_xlabel('Time')
+ax[0][1].set_ylabel('Amplitude')
 
-fig, ax = plt.subplots(2, 1)
-ax[0].plot(reconstructed_msg.real)
-ax[0].set_xlabel('Time')
-ax[0].set_ylabel('Amplitude')
-ax[1].plot(frq,abs(Y),'r') # plotting the spectrum
-ax[1].set_xlabel('Freq (Hz)')
-ax[1].set_ylabel('|Y(freq)|')
+ax[1][0].plot(frq_reconstructed_msg, np.abs(Y_reconstructed_msg), "r")
+ax[1][0].set_title("Fourier transform of the reconstructed signal")
+ax[1][0].set_xlabel('Freq (Hz)')
+ax[1][0].set_ylabel('|Y(freq)|')
 
+ax[1][1].plot(demodulated_signal.real)
+ax[1][1].set_title("Signal after demodulation")
+ax[1][1].set_xlabel('Time')
+ax[1][1].set_ylabel('Amplitude')
+
+ax[2][0].plot(frq_demodulated, np.abs(Y_demodulated), "r")
+ax[2][0].set_title("Fourier transform of the demodulated signal")
+ax[2][0].set_xlabel('Freq (Hz)')
+ax[2][0].set_ylabel('|Y(freq)|')
+
+ax[2][1].plot(matched_filter.real)
+ax[2][1].set_title("Signal after matched filter")
+ax[2][1].set_xlabel('Time')
+ax[2][1].set_ylabel('Amplitude')
 plt.show()
