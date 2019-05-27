@@ -35,7 +35,7 @@ sum_high = np.sum(np.abs(Y_reconstructed_msg[k:l]))
 cut = 2000 if sum_low > sum_high else 8000
 
 
-print("Demodulating signal...")
+print("Demodulating signal... \n")
 pulse = np.linspace(0, len(reconstructed_msg)/sampling_rate, len(reconstructed_msg))
 demodulated_signal = reconstructed_msg * np.exp(1j * -cut*2*np.pi * pulse)
 demodulated_signal = butter_lowpass_filter(demodulated_signal, 1000, sampling_rate, order=15)
@@ -58,9 +58,11 @@ for i in range(1, int(len(demodulated_signal)/(sampling_rate*period_symbol)) +1)
         txt += "0"
 
 
+print("==============RECOVERED FILE====================\n")
+
 n = int(txt, 2)
-recovered = n.to_bytes((n.bit_length() + 7) // 8, 'big').decode()
-print(recovered)
+recovered = n.to_bytes((n.bit_length() + 7) // 8, 'big').decode("unicode_escape")
+print(recovered + "\n")
 original = open("in.txt").read()
 errors = 0
 for i in range(len(original)):
