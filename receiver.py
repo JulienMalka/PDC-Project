@@ -1,8 +1,7 @@
-import numpy as np
 import matplotlib.pyplot as plt
 import scipy
 from helpers import *
-import binascii
+
 
 print("Loading training signals...")
 len_train, train_sig_start = generate_training_sig_start()

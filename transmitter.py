@@ -30,7 +30,7 @@ pulse = np.linspace(0, nb_bits*period_symbol, len(msg_sig))
 msg_sig1 = msg_sig * np.exp(1j * 2000*2*np.pi * pulse)
 msg_sig2 = msg_sig * np.exp(1j * 8000*2*np.pi * pulse)
 msg_sig = msg_sig1+msg_sig2
-msg_sig /= 3
+msg_sig /= 2
 
 print("Adding training signals...")
 msg_sig = np.concatenate([train_sig_start, msg_sig, train_sig_end])

@@ -1,4 +1,4 @@
-from scipy.signal import butter, lfilter, freqz
+from scipy.signal import butter, lfilter
 import numpy as np
 
 
@@ -86,5 +86,5 @@ def raised_cosine(time_per_symb, samp_freq, roll_off=0.51):
 
 
     factor = 4 * roll_off / (np.pi * np.sqrt(time_per_symb))
-    out = np.sqrt(time_per_symb)/2 *  factor * numerator / denominator
+    out = np.sqrt(time_per_symb)/2 * factor * numerator / denominator
     return pulse, out
